@@ -179,6 +179,51 @@ _INDEX_STATEMENTS = (
 )
 
 
+def _ensure_verification_cache_table(conn):
+    """Create verification_cache table if not exists."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS verification_cache (
+            scholarship_id INTEGER PRIMARY KEY,
+            scholarship_name TEXT,
+            provider TEXT,
+            verified_at TEXT,
+            source_url TEXT,
+            status TEXT,
+            claims_json TEXT,
+            discrepancies_json TEXT,
+            raw_evidence TEXT,
+            FOREIGN KEY (scholarship_id) REFERENCES scholarships(id) ON DELETE CASCADE
+        );
+        """
+    )
+
+
+def seed_database_if_empty(workbook_path=None):
+    """
+    Check if scholarships table is empty, and if so, automatically import records
+    from the default or specified Excel workbook.
+    """
+    if workbook_path is None:
+        workbook_path = DATA_DIR / "Pakistan_Scholarship_Finder_Master.xlsx"
+
+    p = Path(workbook_path)
+    if not p.exists():
+        return {"seeded": False, "reason": f"Workbook not found at {p}"}
+
+    conn = get_connection()
+    try:
+        count = conn.execute("SELECT COUNT(*) FROM scholarships").fetchone()[0]
+        if count > 0:
+            return {"seeded": False, "count": count, "reason": "Database already contains records"}
+
+        from src.data_import import import_workbook
+        res = import_workbook(p)
+        return {"seeded": True, "import_summary": res}
+    finally:
+        conn.close()
+
+
 def init_db():
     """
     Initialize the scholarships database (idempotent).
@@ -197,6 +242,7 @@ def init_db():
         # default mode would not open one for DDL).
         conn.execute("BEGIN IMMEDIATE")
         _ensure_schema(conn)
+        _ensure_verification_cache_table(conn)
         for stmt in _INDEX_STATEMENTS:
             conn.execute(stmt)
         conn.commit()
