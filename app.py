@@ -1,6 +1,8 @@
-from dotenv import load_dotenv
-
-load_dotenv()
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 import html
 import re
@@ -234,14 +236,45 @@ def render_sidebar():
 
         st.markdown("---")
 
-        # 2. Saved Matches Section
+        # 2. Interactive Recommendation Filters Section
+        st.subheader("🔍 Filters")
+        st.selectbox(
+            "Eligibility Status",
+            ["All", "Eligible", "Potentially Eligible", "Needs Information"],
+            key="status_filter",
+        )
+        st.selectbox(
+            "Location / Destination",
+            ["All", "Pakistan", "Abroad"],
+            key="dest_filter",
+        )
+
+        st.markdown("---")
+
+        # 3. Saved Matches Section with interactive un-save management
         st.subheader("⭐ Saved Scholarships")
         if not st.session_state.saved_scholarships:
             st.caption("No scholarships saved yet. Click '⭐ Save' on recommended cards.")
         else:
-            for s in st.session_state.saved_scholarships:
-                st.markdown(f"**{safe_text(s.get('name'))}**")
+            for idx, s in enumerate(list(st.session_state.saved_scholarships)):
+                s_name = safe_text(s.get("name"), "Scholarship")
+                s_id = s.get("id", idx)
+                st.markdown(f"**{s_name}**")
                 st.caption(f"Provider: {safe_text(s.get('provider'))} | Deadline: {safe_text(s.get('deadline'))}")
+                c1, c2 = st.columns([1, 1])
+                with c1:
+                    app_link = s.get("application_url") or s.get("source_url")
+                    if app_link and is_valid_url(app_link):
+                        st.markdown(f"🔗 [Link]({app_link.strip()})")
+                with c2:
+                    if st.button("❌ Remove", key=f"unsave_sb_{s_id}_{idx}"):
+                        st.session_state.saved_scholarships.pop(idx)
+                        st.toast(f"Removed {s_name} from saved list!")
+                        st.rerun()
+            if st.button("🗑️ Clear Saved List"):
+                st.session_state.saved_scholarships = []
+                st.toast("Saved scholarships cleared.")
+                st.rerun()
 
         st.markdown("---")
 
@@ -279,6 +312,7 @@ def display_scholarship_card(item):
     funding = safe_text(item.get("funding"))
     deadline = safe_text(item.get("deadline"))
     location = safe_text(item.get("location"))
+    description = safe_text(item.get("description"), "")
     verified_at = safe_text(item.get("verified_at"), "")
 
     reasons = item.get("reasons") if isinstance(item.get("reasons"), list) else []
@@ -323,10 +357,37 @@ def display_scholarship_card(item):
         else:
             st.caption("No direct link")
     with c3:
-        if st.button("⭐ Save", key=f"save_{item.get('id')}_{name}"):
-            if item not in st.session_state.saved_scholarships:
+        is_saved = any(s.get("id") == item.get("id") and s.get("name") == item.get("name") for s in st.session_state.saved_scholarships)
+        if is_saved:
+            if st.button("❌ Unsave", key=f"unsave_card_{item.get('id')}_{name}"):
+                st.session_state.saved_scholarships = [
+                    s for s in st.session_state.saved_scholarships if not (s.get("id") == item.get("id") and s.get("name") == item.get("name"))
+                ]
+                st.toast(f"Removed {name} from saved list!")
+                st.rerun()
+        else:
+            if st.button("⭐ Save", key=f"save_card_{item.get('id')}_{name}"):
                 st.session_state.saved_scholarships.append(item)
                 st.toast(f"Saved {name}!")
+                st.rerun()
+
+    with st.expander(f"ℹ️ Details & Eligibility Criteria for {name}", expanded=False):
+        if description and description != "N/A":
+            st.write(f"**Description:** {description}")
+        st.write(f"**Funding Amount / Coverage:** {funding}")
+        st.write(f"**Target Location:** {location}")
+        if reasons:
+            st.write("**Full Matching Reasons:**")
+            for r in reasons:
+                st.write(f"- {r}")
+        if missing_info:
+            st.write("**Information Needed for Evaluation:**")
+            for m in missing_info:
+                st.write(f"- {m}")
+        if valid_app:
+            st.markdown(f"🔗 **Application Portal:** [{valid_app}]({valid_app})")
+        if valid_src:
+            st.markdown(f"🌐 **Official Source:** [{valid_src}]({valid_src})")
 
 
 def main():
@@ -342,16 +403,51 @@ def main():
 
     # Render Active Recommendation Cards under chat if available
     if st.session_state.current_scholarships:
-        st.markdown("### 🎯 Recommended Opportunities")
-        for sch in st.session_state.current_scholarships[:5]:
-            display_scholarship_card(sch)
+        filtered_schs = list(st.session_state.current_scholarships)
+        status_f = st.session_state.get("status_filter", "All")
+        dest_f = st.session_state.get("dest_filter", "All")
 
-    # Chat Input Box
-    if user_prompt := st.chat_input("Ask about scholarships, eligibility, SOPs, or update your profile..."):
+        if status_f != "All":
+            if status_f == "Eligible":
+                filtered_schs = [s for s in filtered_schs if str(s.get("eligibility_status")).lower() == "eligible"]
+            elif status_f == "Potentially Eligible":
+                filtered_schs = [s for s in filtered_schs if str(s.get("eligibility_status")).lower() in ["potentially_eligible", "potentially eligible"]]
+            elif status_f == "Needs Information":
+                filtered_schs = [s for s in filtered_schs if str(s.get("eligibility_status")).lower() not in ["eligible", "potentially_eligible", "potentially eligible"]]
+
+        if dest_f != "All":
+            if dest_f == "Pakistan":
+                filtered_schs = [s for s in filtered_schs if "pakistan" in str(s.get("location")).lower() or "local" in str(s.get("location")).lower()]
+            elif dest_f == "Abroad":
+                filtered_schs = [s for s in filtered_schs if "pakistan" not in str(s.get("location")).lower()]
+
+        st.markdown("### 🎯 Recommended Opportunities")
+        if not filtered_schs:
+            st.info("No scholarship opportunities match the selected sidebar filters.")
+        else:
+            for sch in filtered_schs[:5]:
+                display_scholarship_card(sch)
+
+    # Interactive Quick Query Prompt Chips
+    st.markdown("#### 💡 Quick Actions & Common Queries")
+    q1, q2, q3, q4 = st.columns(4)
+    pending_prompt = None
+    if q1.button("🎓 Undergrad in Punjab"):
+        pending_prompt = "Find undergraduate scholarships in Punjab for me."
+    if q2.button("✈️ Masters Abroad"):
+        pending_prompt = "Show me master's degree scholarships available abroad."
+    if q3.button("📝 SOP Guidance"):
+        pending_prompt = "How should I structure my Statement of Purpose (SOP) for scholarship applications?"
+    if q4.button("🔍 High Percentage Matches"):
+        pending_prompt = "Find scholarships for students with high percentage or CGPA."
+
+    user_input = st.chat_input("Ask about scholarships, eligibility, SOPs, or update your profile...")
+    user_prompt = pending_prompt if pending_prompt else user_input
+
+    # Process Message
+    if user_prompt:
         # Display User Message
         st.session_state.chat_history.append({"role": "user", "content": user_prompt})
-        with st.chat_message("user"):
-            st.markdown(user_prompt)
 
         # Process message with AI Agent
         with st.spinner("PathFinder AI is thinking and searching database..."):
@@ -369,8 +465,6 @@ def main():
         # Display Assistant Response
         assistant_reply = res["response"]
         st.session_state.chat_history.append({"role": "assistant", "content": assistant_reply})
-        with st.chat_message("assistant"):
-            st.markdown(assistant_reply)
 
         st.rerun()
 
