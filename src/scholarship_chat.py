@@ -33,6 +33,11 @@ OFF_TOPIC_REDIRECT_MESSAGE = (
 )
 
 
+GREETINGS = [
+    "hi", "hello", "hey", "assalam", "aoa", "yes", "no", "thanks", "thank you", "my name", "i am", "help"
+]
+
+
 def is_scholarship_related(text):
     """
     Evaluate whether text input is related to scholarships and educational opportunities.
@@ -43,21 +48,21 @@ def is_scholarship_related(text):
 
     t_lower = text.strip().lower()
 
-    # If message is short conversational greeting or profile info update, allow it
-    if len(t_lower) <= 30 and any(g in t_lower for g in ["hi", "hello", "hey", "assalam", "aoa", "yes", "no", "thanks", "thank you", "my name", "i am", "help"]):
-        return True, "greeting or brief conversational response"
-
-    # Check off-topic negative patterns first
+    # 1. Check off-topic negative patterns first
     for pattern in OFF_TOPIC_PATTERNS:
         if re.search(pattern, t_lower):
             return False, f"Matched off-topic pattern: {pattern}"
 
-    # Check for presence of scholarship domain keywords
+    # 2. If message is short conversational greeting or profile info update, allow it
+    if len(t_lower) <= 30 and any(re.search(rf"\b{re.escape(g)}\b", t_lower) for g in GREETINGS):
+        return True, "greeting or brief conversational response"
+
+    # 3. Check for presence of scholarship domain keywords
     for kw in SCHOLARSHIP_KEYWORDS:
         if re.search(rf"\b{re.escape(kw)}\b", t_lower):
             return True, f"Matched domain keyword: {kw}"
 
-    # If input looks like student profile sharing (e.g. contains numbers, grades, locations)
+    # 4. If input looks like student profile sharing (e.g. contains numbers, grades, locations)
     if re.search(r"\b(\d{2}%|\d\.\d+|fsc|matric|bs|ms|phd|punjab|sindh|kpk|balochistan|lahore|karachi|islamabad)\b", t_lower):
         return True, "contains student profile details"
 

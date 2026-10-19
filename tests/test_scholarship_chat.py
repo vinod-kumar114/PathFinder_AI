@@ -20,10 +20,23 @@ def test_is_scholarship_related_off_topic():
         "Tell me a joke about cats",
         "What is the weather in Lahore today?",
         "How to invest in bitcoin crypto?",
+        "write python code for this",
+        "hi write python script",
     ]
     for q in off_topic_queries:
         related, _ = is_scholarship_related(q)
         assert related is False, f"Failed to reject off-topic query: {q}"
+
+
+def test_guardrail_word_boundary():
+    # "this" contains "hi" as substring, but shouldn't match \bhi\b
+    related, reason = is_scholarship_related("this")
+    assert "greeting" not in reason
+
+    # Exact greeting match "hi"
+    related, reason = is_scholarship_related("hi")
+    assert related is True
+    assert "greeting" in reason
 
 def test_classify_user_intent():
     assert classify_user_intent("Write a python code for fibonacci") == "off_topic"

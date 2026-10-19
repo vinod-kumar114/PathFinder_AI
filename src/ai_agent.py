@@ -83,6 +83,18 @@ def process_chat_message(user_message, conversation_history=None, current_profil
 
     profile_summary = summarize_profile(profile)
 
+    # Format conversation history
+    history_str = ""
+    if conversation_history:
+        history_lines = []
+        for msg in conversation_history:
+            role = "Student" if msg.get("role") == "user" else "Assistant"
+            content = msg.get("content", "")
+            if content:
+                history_lines.append(f"{role}: {content}")
+        if history_lines:
+            history_str = "Conversation History:\n" + "\n".join(history_lines) + "\n\n"
+
     # Prepare lightweight matching JSON for LLM prompt
     match_context = []
     for m in matches[:5]:  # Top 5 records only
@@ -99,6 +111,7 @@ def process_chat_message(user_message, conversation_history=None, current_profil
         })
 
     prompt_context = (
+        f"{history_str}"
         f"Student Profile Summary: {profile_summary}\n"
         f"Missing Profile Info: {', '.join(missing_fields) if missing_fields else 'None (Profile Complete)'}\n\n"
         f"Top Database Scholarship Matches:\n{json.dumps(match_context, indent=2)}\n\n"
