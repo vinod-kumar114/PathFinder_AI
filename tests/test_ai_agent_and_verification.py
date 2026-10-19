@@ -30,3 +30,12 @@ def test_process_chat_message_fallback(isolated_database):
     assert res["intent"] == "scholarship_chat"
     assert res["updated_profile"]["province"] == "Punjab"
     assert isinstance(res["scholarships"], list)
+
+def test_process_chat_message_conversation_history(isolated_database):
+    history = [
+        {"role": "user", "content": "I am looking for undergraduate scholarships"},
+        {"role": "assistant", "content": "Sure, what is your province?"},
+    ]
+    res = process_chat_message("Punjab", conversation_history=history)
+    assert res["intent"] == "scholarship_chat"
+    assert res["updated_profile"]["province"] == "Punjab"

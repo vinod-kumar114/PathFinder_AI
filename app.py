@@ -1,3 +1,7 @@
+from dotenv import load_dotenv
+
+load_dotenv()
+
 import html
 import re
 import sys
@@ -156,31 +160,65 @@ def render_sidebar():
         # Edit Profile Expander
         with st.expander("✏️ Update Profile Details", expanded=False):
             with st.form("edit_profile_form"):
+                edu_options = [
+                    "Undergraduate / Bachelors",
+                    "Intermediate / A-Level",
+                    "Postgraduate / Masters",
+                    "Doctoral / PhD",
+                    "Matriculation / O-Level",
+                ]
+                curr_edu = st.session_state.profile.get("education_level")
+                edu_index = edu_options.index(curr_edu) if curr_edu in edu_options else 0
+
                 e_level = st.selectbox(
                     "Education Level",
-                    [
-                        "Undergraduate / Bachelors",
-                        "Intermediate / A-Level",
-                        "Postgraduate / Masters",
-                        "Doctoral / PhD",
-                        "Matriculation / O-Level",
-                    ],
-                    index=0,
+                    edu_options,
+                    index=edu_index,
                 )
                 field = st.text_input("Field of Study", value=st.session_state.profile.get("field_of_study") or "")
-                grading = st.radio("Grading System", ["CGPA", "Percentage (%)"], horizontal=True)
-                if grading == "CGPA":
-                    cgpa_v = st.number_input("CGPA", min_value=0.0, max_value=4.0, value=float(st.session_state.profile.get("cgpa") or 0.0), step=0.01)
-                    marks_v = None
-                else:
-                    marks_v = st.number_input("Percentage (%)", min_value=0.0, max_value=100.0, value=float(st.session_state.profile.get("marks") or 0.0), step=0.1)
-                    cgpa_v = None
+
+                cgpa_v = st.number_input(
+                    "CGPA",
+                    min_value=0.0,
+                    max_value=4.0,
+                    value=float(st.session_state.profile.get("cgpa") or 0.0),
+                    step=0.01,
+                )
+                marks_v = st.number_input(
+                    "Percentage (%)",
+                    min_value=0.0,
+                    max_value=100.0,
+                    value=float(st.session_state.profile.get("marks") or 0.0),
+                    step=0.1,
+                )
+
+                prov_options = [
+                    "Punjab",
+                    "Sindh",
+                    "Khyber Pakhtunkhwa",
+                    "Balochistan",
+                    "Islamabad Capital Territory",
+                    "Gilgit-Baltistan",
+                    "Azad Jammu & Kashmir",
+                ]
+                curr_prov = st.session_state.profile.get("province")
+                prov_index = prov_options.index(curr_prov) if curr_prov in prov_options else 0
 
                 prov = st.selectbox(
                     "Province",
-                    ["Punjab", "Sindh", "Khyber Pakhtunkhwa", "Balochistan", "Islamabad Capital Territory", "Gilgit-Baltistan", "Azad Jammu & Kashmir"],
+                    prov_options,
+                    index=prov_index,
                 )
-                dest = st.selectbox("Destination", ["Pakistan", "Abroad", "Both"])
+
+                dest_options = ["Pakistan", "Abroad", "Both"]
+                curr_dest = st.session_state.profile.get("study_destination")
+                dest_index = dest_options.index(curr_dest) if curr_dest in dest_options else 0
+
+                dest = st.selectbox(
+                    "Destination",
+                    dest_options,
+                    index=dest_index,
+                )
 
                 if st.form_submit_button("Save Profile Updates"):
                     st.session_state.profile.update({
