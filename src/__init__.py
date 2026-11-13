@@ -1,1 +1,0 @@
-"""Scholarship Finder package."""
